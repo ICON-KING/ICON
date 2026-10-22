@@ -179,8 +179,201 @@ async function requireAdmin(request, env) {
   const ok = await isAdmin(request, env);
   return ok ? null : json({ error: "관리자 인증이 필요합니다. 다시 로그인해 주세요." }, 401);
 }
+const VAPID_PUBLIC_KEY = "BM6FKmNMPKqSj96oj5HSO_u8bntMjd43U_hPdqEKlYsb6KPR4o5fJ5HnuNavarXsRuNzWk9XTs6ZJKHjXHQI3lY";
 
-async function handle(request, env) {
+function base64UrlToBytes(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/");
+  const normalized = padded + "=".repeat((4 - padded.length % 4) % 4);
+  const binary = atob(normalized);
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+function bytesToBase64Url(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).split("=").join("").split("+").join("-").split("/").join("_");
+}
+
+function concatBytes(...parts) {
+  const length = parts.reduce((total, part) => total + part.length, 0);
+  const output = new Uint8Array(length);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+
+async function hmacRaw(keyBytes, dataBytes) {
+  const key = await crypto.subtle.importKey(
+    "raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, dataBytes));
+}
+
+async function hkdfExtract(salt, inputKeyMaterial) {
+  return hmacRaw(salt, inputKeyMaterial);
+}
+
+async function hkdfExpand(pseudorandomKey, info, length) {
+  const blocks = [];
+  let previous = new Uint8Array(0);
+  let outputLength = 0;
+  for (let counter = 1; outputLength < length; counter++) {
+    previous = await hmacRaw(
+      pseudorandomKey,
+      concatBytes(previous, info, new Uint8Array([counter]))
+    );
+    blocks.push(previous);
+    outputLength += previous.length;
+  }
+  return concatBytes(...blocks).slice(0, length);
+}
+
+function textBytes(value) {
+  return new TextEncoder().encode(value);
+}
+
+async function createVapidToken(endpoint, env) {
+  if (!env.VAPID_PRIVATE_KEY) throw new Error("VAPID private key is not configured");
+  const endpointUrl = new URL(endpoint);
+  const header = bytesToBase64Url(textBytes(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claims = {
+    aud: endpointUrl.origin,
+    exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+    sub: "https://mythic-community.mythic-hub-2026.workers.dev"
+  };
+  const payload = bytesToBase64Url(textBytes(JSON.stringify(claims)));
+  const signingInput = header + "." + payload;
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    base64UrlToBytes(env.VAPID_PRIVATE_KEY),
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    privateKey,
+    textBytes(signingInput)
+  ));
+  return signingInput + "." + bytesToBase64Url(signature);
+}
+
+async function encryptWebPush(subscription, payload) {
+  const userPublicKey = base64UrlToBytes(subscription.p256dh);
+  const authSecret = base64UrlToBytes(subscription.auth_secret);
+  if (userPublicKey.length !== 65 || userPublicKey[0] !== 4 || authSecret.length !== 16) {
+    throw new Error("Invalid Web Push subscription keys");
+  }
+  const userKey = await crypto.subtle.importKey(
+    "raw",
+    userPublicKey,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    []
+  );
+  const serverKeyPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveBits"]
+  );
+  const sharedSecret = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: "ECDH", public: userKey },
+    serverKeyPair.privateKey,
+    256
+  ));
+  const serverPublicKey = new Uint8Array(await crypto.subtle.exportKey("raw", serverKeyPair.publicKey));
+  const authPrk = await hkdfExtract(authSecret, sharedSecret);
+  const keyInfo = concatBytes(textBytes("WebPush: info"), new Uint8Array([0]), userPublicKey, serverPublicKey);
+  const inputKeyMaterial = await hkdfExpand(authPrk, keyInfo, 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const prk = await hkdfExtract(salt, inputKeyMaterial);
+  const contentEncryptionKey = await hkdfExpand(
+    prk,
+    concatBytes(textBytes("Content-Encoding: aes128gcm"), new Uint8Array([0])),
+    16
+  );
+  const nonce = await hkdfExpand(
+    prk,
+    concatBytes(textBytes("Content-Encoding: nonce"), new Uint8Array([0])),
+    12
+  );
+  const plaintext = concatBytes(textBytes(JSON.stringify(payload)), new Uint8Array([2]));
+  if (plaintext.length > 3900) throw new Error("Web Push payload is too large");
+  const aesKey = await crypto.subtle.importKey("raw", contentEncryptionKey, "AES-GCM", false, ["encrypt"]);
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce, tagLength: 128 },
+    aesKey,
+    plaintext
+  ));
+  return concatBytes(
+    salt,
+    new Uint8Array([0, 0, 16, 0]),
+    new Uint8Array([serverPublicKey.length]),
+    serverPublicKey,
+    ciphertext
+  );
+}
+
+function isSupportedPushEndpoint(endpoint) {
+  try {
+    const url = new URL(endpoint);
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
+    const host = url.hostname.toLowerCase();
+    return host === "fcm.googleapis.com" ||
+      host === "updates.push.services.mozilla.com" ||
+      host.endsWith(".push.services.mozilla.com") ||
+      host === "web.push.apple.com" ||
+      host.endsWith(".push.apple.com") ||
+      host.endsWith(".notify.windows.com");
+  } catch {
+    return false;
+  }
+}
+
+async function sendOnePush(env, subscription, payload) {
+  const token = await createVapidToken(subscription.endpoint, env);
+  const encryptedBody = await encryptWebPush(subscription, payload);
+  const response = await fetch(subscription.endpoint, {
+    method: "POST",
+    headers: {
+      "Authorization": "vapid t=" + token + ", k=" + VAPID_PUBLIC_KEY,
+      "Content-Type": "application/octet-stream",
+      "Content-Encoding": "aes128gcm",
+      "TTL": "86400",
+      "Urgency": "normal"
+    },
+    body: encryptedBody
+  });
+  if (response.status === 404 || response.status === 410) {
+    await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint_hash = ?")
+      .bind(subscription.endpoint_hash).run();
+  }
+  return response.ok;
+}
+
+async function sendPushNotifications(env, payload) {
+  try {
+    if (!env.VAPID_PRIVATE_KEY) return;
+    const rows = await env.DB.prepare(
+      "SELECT endpoint_hash, endpoint, p256dh, auth_secret FROM push_subscriptions ORDER BY created_at DESC LIMIT 40"
+    ).all();
+    await Promise.all((rows.results || []).map(async subscription => {
+      try {
+        await sendOnePush(env, subscription, payload);
+      } catch (error) {
+        console.warn("MYTHIC push delivery failed:", error?.message || "unknown");
+      }
+    }));
+  } catch (error) {
+    console.warn("MYTHIC push dispatch failed:", error?.message || "unknown");
+  }
+}
+
+
+async function handle(request, env, ctx) {
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
   const path = parsePath(url);
@@ -222,6 +415,56 @@ async function handle(request, env) {
       db.prepare("SELECT COUNT(*) AS count FROM posts").first()
     ]);
     return json({ posts: rows.results || [], total: Number(total?.count || 0) });
+  }
+
+  if (path.length === 2 && path[0] === "push" && path[1] === "public-key" && method === "GET") {
+    return json({ public_key: VAPID_PUBLIC_KEY });
+  }
+
+  if (path.length === 2 && path[0] === "push" && path[1] === "subscribe" && method === "POST") {
+    if (!env.VAPID_PRIVATE_KEY) return json({ error: "백그라운드 푸시 설정이 완료되지 않았습니다." }, 503);
+    const ipHash = await clientIpHash(request, env);
+    if (!await allowRate(db, ipHash, "push-subscribe", 12, 3600)) {
+      return json({ error: "알림 설정 변경이 너무 잦습니다. 잠시 후 다시 시도해 주세요." }, 429);
+    }
+    const parsed = await readJson(request, 20_000);
+    if (parsed.error) return json({ error: parsed.error }, parsed.status);
+    const subscription = parsed.body || {};
+    const endpoint = typeof subscription.endpoint === "string" ? subscription.endpoint : "";
+    const p256dh = typeof subscription.keys?.p256dh === "string" ? subscription.keys.p256dh : "";
+    const authSecret = typeof subscription.keys?.auth === "string" ? subscription.keys.auth : "";
+    if (!endpoint || endpoint.length > 2048 || !isSupportedPushEndpoint(endpoint)) {
+      return json({ error: "지원되는 브라우저 푸시 주소가 아닙니다." }, 400);
+    }
+    try {
+      if (base64UrlToBytes(p256dh).length !== 65 || base64UrlToBytes(authSecret).length !== 16) {
+        return json({ error: "브라우저 알림 구독 정보가 올바르지 않습니다." }, 400);
+      }
+    } catch {
+      return json({ error: "브라우저 알림 구독 정보가 올바르지 않습니다." }, 400);
+    }
+    const endpointHash = await sha256Hex(endpoint);
+    await db.prepare(
+      "INSERT INTO push_subscriptions (endpoint_hash, endpoint, p256dh, auth_secret, created_at) " +
+      "VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now')) " +
+      "ON CONFLICT(endpoint_hash) DO UPDATE SET endpoint=excluded.endpoint, p256dh=excluded.p256dh, " +
+      "auth_secret=excluded.auth_secret, created_at=excluded.created_at"
+    ).bind(endpointHash, endpoint, p256dh, authSecret).run();
+    return json({ ok: true });
+  }
+
+  if (path.length === 2 && path[0] === "push" && path[1] === "unsubscribe" && method === "POST") {
+    const parsed = await readJson(request, 20_000);
+    if (parsed.error) return json({ error: parsed.error }, parsed.status);
+    const endpoint = typeof parsed.body?.endpoint === "string" ? parsed.body.endpoint : "";
+    const p256dh = typeof parsed.body?.keys?.p256dh === "string" ? parsed.body.keys.p256dh : "";
+    if (!endpoint || endpoint.length > 2048 || !isSupportedPushEndpoint(endpoint) || !p256dh) {
+      return json({ error: "알림 구독 정보가 올바르지 않습니다." }, 400);
+    }
+    const endpointHash = await sha256Hex(endpoint);
+    await db.prepare("DELETE FROM push_subscriptions WHERE endpoint_hash = ? AND p256dh = ?")
+      .bind(endpointHash, p256dh).run();
+    return json({ ok: true });
   }
 
   if (path.length === 1 && path[0] === "notifications" && method === "GET") {
@@ -290,6 +533,15 @@ async function handle(request, env) {
       ).bind(crypto.randomUUID(), id, image.data_url, image.thumbnail_url, index));
     });
     await db.batch(queries);
+    const pushPayload = {
+      title: "MYTHIC · 새 게시글",
+      body: title,
+      url: "/?post=" + encodeURIComponent(id),
+      tag: "mythic-post-" + id
+    };
+    const pushTask = sendPushNotifications(env, pushPayload);
+    if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(pushTask);
+    else await pushTask;
     return json({ ok: true, id }, 201);
   }
 
@@ -326,6 +578,15 @@ async function handle(request, env) {
       "INSERT INTO comments (id, post_id, author, content, created_at) VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
     ).bind(id, postId, author, content).run();
     const comment = await db.prepare("SELECT id, author, content, created_at FROM comments WHERE id = ?").bind(id).first();
+    const pushPayload = {
+      title: "MYTHIC · 새 댓글",
+      body: author + ": " + content.slice(0, 110),
+      url: "/?post=" + encodeURIComponent(postId),
+      tag: "mythic-comment-" + id
+    };
+    const pushTask = sendPushNotifications(env, pushPayload);
+    if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(pushTask);
+    else await pushTask;
     return json({ ok: true, comment }, 201);
   }
 
@@ -433,7 +694,7 @@ async function handle(request, env) {
 
 export async function onRequest(context) {
   try {
-    return await handle(context.request, context.env);
+    return await handle(context.request, context.env, context);
   } catch (error) {
     // Do not log visitor IPs or request bodies.
     console.error("MYTHIC API failure:", error?.message || "unknown");
