@@ -522,21 +522,7 @@
       const incoming = Array.isArray(data.notifications) ? data.notifications : [];
       const incomingIds = new Set(incoming.map(item => item.id));
       const firstRun = !state.notificationInitialized;
-      if (!firstRun) {
-        incoming.forEach(item => {
-          if (!state.lastNotificationIds.has(item.id) && NotificationPermissionGranted() && document.visibilityState !== "visible") {
-            try {
-              new Notification("MYTHIC · 새 게시글", {
-                body: item.title,
-                icon: "/icon.svg",
-                tag: "mythic-post-" + item.id
-              });
-            } catch {}
-          }
-        });
-      } else {
-        incoming.forEach(item => state.notificationSeen.add(item.id));
-      }
+      if (firstRun) incoming.forEach(item => state.notificationSeen.add(item.id));
       state.notifications = incoming;
       state.lastNotificationIds = incomingIds;
       state.notificationInitialized = true;
@@ -552,10 +538,6 @@
         els.notificationList.replaceChildren(node("p", "muted-empty", "알림을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."));
       }
     }
-  }
-
-  function NotificationPermissionGranted() {
-    return "Notification" in window && Notification.permission === "granted";
   }
 
   function renderNotifications() {
@@ -598,22 +580,108 @@
     if (!els.notificationPanel.hidden) loadNotifications(true);
   }
 
-  async function enableBrowserNotifications() {
-    if (!("Notification" in window)) {
-      toast("이 브라우저는 시스템 알림을 지원하지 않습니다.", "error");
+  function urlBase64ToUint8Array(value) {
+    const padding = "=".repeat((4 - value.length % 4) % 4);
+    const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(base64);
+    const output = new Uint8Array(raw.length);
+    for (let index = 0; index < raw.length; index++) output[index] = raw.charCodeAt(index);
+    return output;
+  }
+
+  async function refreshPushButton() {
+    const button = els.enableBrowserNotifications;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      button.disabled = true;
+      button.textContent = "이 브라우저는 푸시를 지원하지 않습니다";
       return;
     }
     try {
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
-        toast("브라우저 알림을 켰습니다. 사이트가 열려 있을 때 새 글 알림을 받을 수 있어요.");
-        els.enableBrowserNotifications.textContent = "브라우저 알림 사용 중";
-        els.enableBrowserNotifications.disabled = true;
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        button.disabled = false;
+        button.textContent = "백그라운드 푸시 알림 끄기";
+        button.dataset.pushEnabled = "true";
+      } else if (Notification.permission === "denied") {
+        button.disabled = true;
+        button.textContent = "브라우저 설정에서 알림을 허용해 주세요";
+        button.dataset.pushEnabled = "false";
       } else {
-        toast("브라우저 설정에서 알림 권한을 허용해 주세요.", "error");
+        button.disabled = false;
+        button.textContent = "백그라운드 푸시 알림 켜기";
+        button.dataset.pushEnabled = "false";
       }
     } catch {
-      toast("알림 권한을 요청하지 못했습니다.", "error");
+      button.disabled = false;
+      button.textContent = "백그라운드 푸시 알림 켜기";
+      button.dataset.pushEnabled = "false";
+    }
+  }
+
+  async function enableBrowserNotifications() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      toast("이 브라우저는 백그라운드 푸시를 지원하지 않습니다. 최신 브라우저를 사용해 주세요.", "error");
+      return;
+    }
+    if (!window.isSecureContext) {
+      toast("푸시 알림은 HTTPS 사이트에서만 사용할 수 있습니다.", "error");
+      return;
+    }
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (subscription) {
+        await api("/api/push/unsubscribe", {
+          method: "POST",
+          body: JSON.stringify(subscription.toJSON())
+        });
+        await subscription.unsubscribe();
+        await refreshPushButton();
+        toast("백그라운드 푸시 알림을 해제했습니다.");
+        return;
+      }
+
+      if (Notification.permission === "denied") {
+        toast("브라우저의 사이트 설정에서 MYTHIC 알림을 허용한 뒤 다시 시도해 주세요.", "error");
+        return;
+      }
+      const permission = Notification.permission === "granted"
+        ? "granted"
+        : await Notification.requestPermission();
+      if (permission !== "granted") {
+        toast("백그라운드 푸시를 받으려면 브라우저 알림 권한이 필요합니다.", "error");
+        await refreshPushButton();
+        return;
+      }
+
+      const keyResponse = await api("/api/push/public-key");
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyResponse.public_key)
+      });
+      try {
+        await api("/api/push/subscribe", {
+          method: "POST",
+          body: JSON.stringify(subscription.toJSON())
+        });
+      } catch (error) {
+        await subscription.unsubscribe().catch(() => {});
+        throw error;
+      }
+      await refreshPushButton();
+      toast("백그라운드 푸시 알림을 켰습니다. 새 게시글과 댓글이 오면 사이트를 닫아도 알림을 받을 수 있습니다.");
+    } catch (error) {
+      await refreshPushButton();
+      const message = error && error.message ? error.message : "푸시 알림을 설정하지 못했습니다.";
+      const isAppleMobile = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      toast(
+        isAppleMobile
+          ? "iPhone/iPad에서는 MYTHIC을 홈 화면에 추가해 연 다음 푸시 알림을 켜 주세요. (" + message + ")"
+          : message,
+        "error"
+      );
     }
   }
 
@@ -855,14 +923,15 @@
     readSeenNotifications();
     bindEvents();
     els.installBtn.hidden = false;
-    if ("Notification" in window && Notification.permission === "granted") {
-      els.enableBrowserNotifications.textContent = "브라우저 알림 사용 중";
-      els.enableBrowserNotifications.disabled = true;
-    }
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js")
+        .then(() => refreshPushButton())
+        .catch(() => {});
     }
     await Promise.all([loadPosts(), loadNotifications(), recordVisit()]);
+    refreshPushButton();
+    const linkedPost = new URLSearchParams(location.search).get("post");
+    if (linkedPost) openPost(linkedPost);
     window.setInterval(() => loadNotifications(), 60000);
   }
 
