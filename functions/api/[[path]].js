@@ -76,21 +76,55 @@ function clearCookie() {
   return SESSION_COOKIE + "=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict";
 }
 
+async function sha256Hex(value) {
+  return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+async function getAdminConfig(db) {
+  const rows = await db.prepare(
+    "SELECT key, value FROM admin_config WHERE key IN ('password_salt','password_hash','ip_hash_salt')"
+  ).all();
+  return Object.fromEntries((rows.results || []).map(row => [row.key, row.value]));
+}
+
+async function verifyAdminPassword(password, salt, expectedHash) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const digest = await crypto.subtle.deriveBits({
+    name: "PBKDF2",
+    hash: "SHA-256",
+    salt: new TextEncoder().encode(salt),
+    iterations: 210000
+  }, key, 256);
+  return equalConstantTime(hex(digest), expectedHash);
+}
+
 async function createSession(env) {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const token = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+  const tokenHash = await sha256Hex(token);
   const expiry = Math.floor(Date.now() / 1000) + SESSION_SECONDS;
-  const signature = await hmac("MYTHIC_ADMIN:" + expiry, env.ADMIN_SESSION_SECRET);
-  return expiry + "." + signature;
+  await env.DB.prepare(
+    "INSERT INTO admin_sessions (token_hash, expires_at) VALUES (?, ?)"
+  ).bind(tokenHash, expiry).run();
+  await env.DB.prepare("DELETE FROM admin_sessions WHERE expires_at <= ?")
+    .bind(Math.floor(Date.now() / 1000)).run();
+  return token;
 }
 
 async function isAdmin(request, env) {
-  if (!env.ADMIN_SESSION_SECRET) return false;
   const token = cookieValue(request, SESSION_COOKIE);
-  const parts = token.split(".");
-  if (parts.length !== 2) return false;
-  const expiry = Number(parts[0]);
-  if (!Number.isSafeInteger(expiry) || expiry <= Math.floor(Date.now() / 1000)) return false;
-  const expected = await hmac("MYTHIC_ADMIN:" + expiry, env.ADMIN_SESSION_SECRET);
-  return equalConstantTime(expected, parts[1]);
+  if (!/^[a-f0-9]{64}$/.test(token)) return false;
+  const tokenHash = await sha256Hex(token);
+  const row = await env.DB.prepare(
+    "SELECT expires_at FROM admin_sessions WHERE token_hash = ?"
+  ).bind(tokenHash).first();
+  return !!row && Number(row.expires_at) > Math.floor(Date.now() / 1000);
 }
 
 function clientIp(request) {
@@ -98,8 +132,9 @@ function clientIp(request) {
 }
 
 async function clientIpHash(request, env) {
-  const salt = env.IP_HASH_SALT || env.ADMIN_SESSION_SECRET;
-  if (!salt) throw new Error("IP hash secret is not configured");
+  const config = await getAdminConfig(env.DB);
+  const salt = config.ip_hash_salt;
+  if (!salt) throw new Error("IP hash salt is not configured");
   return hmac("visitor-ip:" + clientIp(request), salt);
 }
 
@@ -291,7 +326,8 @@ async function handle(request, env) {
   }
 
   if (path.length === 2 && path[0] === "admin" && path[1] === "login" && method === "POST") {
-    if (!env.ADMIN_PASSWORD || !env.ADMIN_SESSION_SECRET) {
+    const config = await getAdminConfig(db);
+    if (!config.password_salt || !config.password_hash || !config.ip_hash_salt) {
       return json({ error: "관리자 인증 설정이 완료되지 않았습니다." }, 503);
     }
     const ipHash = await clientIpHash(request, env);
@@ -301,7 +337,7 @@ async function handle(request, env) {
     const parsed = await readJson(request, 20_000);
     if (parsed.error) return json({ error: parsed.error }, parsed.status);
     const password = typeof parsed.body?.password === "string" ? parsed.body.password : "";
-    if (password.length > 200 || !equalConstantTime(password, env.ADMIN_PASSWORD)) {
+    if (password.length > 200 || !await verifyAdminPassword(password, config.password_salt, config.password_hash)) {
       return json({ error: "비밀번호가 올바르지 않습니다." }, 401);
     }
     const token = await createSession(env);
@@ -309,6 +345,11 @@ async function handle(request, env) {
   }
 
   if (path.length === 2 && path[0] === "admin" && path[1] === "logout" && method === "POST") {
+    const token = cookieValue(request, SESSION_COOKIE);
+    if (/^[a-f0-9]{64}$/.test(token)) {
+      await db.prepare("DELETE FROM admin_sessions WHERE token_hash = ?")
+        .bind(await sha256Hex(token)).run();
+    }
     return json({ ok: true }, 200, { "Set-Cookie": clearCookie() });
   }
 
