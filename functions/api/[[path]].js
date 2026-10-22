@@ -382,11 +382,11 @@ async function sendPushNotifications(env, payload) {
       try {
         await sendOnePush(env.DB, subscription, payload, vapidConfig);
       } catch (error) {
-        console.warn("MYTHIC push delivery failed:", error?.message || "unknown");
+        console.warn("MYTHIC push delivery failed; endpoint details omitted.");
       }
     }));
   } catch (error) {
-    console.warn("MYTHIC push dispatch failed:", error?.message || "unknown");
+    console.warn("MYTHIC push dispatch failed; details omitted.");
   }
 }
 
