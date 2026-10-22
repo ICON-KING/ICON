@@ -702,7 +702,8 @@
       const wrap = node("div", "chart-bar-wrap");
       const bar = node("div", "chart-bar");
       const value = Number(day.count || 0);
-      const percentage = Math.min(100, Math.max(4, Math.round(value / max * 100)));\n      bar.className = "chart-bar h-" + percentage;
+      const percentage = Math.min(100, Math.max(4, Math.round(value / max * 100)));
+      bar.className = "chart-bar h-" + percentage;
       bar.title = value + "명";
       wrap.append(bar);
       barDay.append(wrap);
