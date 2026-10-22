@@ -1,0 +1,8 @@
+name = "mythic-community"
+pages_build_output_dir = "./"
+compatibility_date = "2026-10-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mythic-community-db"
+database_id = "9749476e-bbb7-4142-8375-cdb05bb0b1e4"
