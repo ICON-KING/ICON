@@ -234,11 +234,15 @@ async function handle(request, env) {
   if (path.length === 1 && path[0] === "visit" && method === "POST") {
     const ipHash = await clientIpHash(request, env);
     const day = koreaDay();
-    await db.batch([
-      db.prepare("INSERT OR IGNORE INTO visitors (ip_hash, first_seen) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))").bind(ipHash),
-      db.prepare("INSERT OR IGNORE INTO daily_visitors (day, ip_hash, first_seen) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))").bind(day, ipHash)
-    ]);
-    return json({ ok: true });
+    const firstVisit = await db.prepare(
+      "INSERT OR IGNORE INTO visitors (ip_hash, first_seen) VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+    ).bind(ipHash).run();
+    if (Number(firstVisit.meta?.changes || 0) > 0) {
+      await db.prepare(
+        "INSERT OR IGNORE INTO daily_visitors (day, ip_hash, first_seen) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
+      ).bind(day, ipHash).run();
+    }
+    return json({ ok: true, new_visitor: Number(firstVisit.meta?.changes || 0) > 0 });
   }
 
   if (path.length === 1 && path[0] === "posts" && method === "POST") {
