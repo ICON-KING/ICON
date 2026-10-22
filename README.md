@@ -1,6 +1,6 @@
 # MYTHIC Community
 
-A responsive Korean-language community site using Cloudflare Pages Functions and D1. No account registration is required to post. Board filters share the same data source: 자유게시판, 질문/답변, 모임/모집, 사진.
+A responsive Korean-language community site deployed as a Cloudflare Worker with D1. No account registration is required to post. Board filters share the same data source: 자유게시판, 질문/답변, 모임/모집, 사진.
 
 ## Included
 
@@ -12,22 +12,14 @@ A responsive Korean-language community site using Cloudflare Pages Functions and
 - Admin dashboard with total unique IPs, daily unique IPs (Asia/Seoul date), post totals, and a 7-day chart.
 - Security headers, same-origin checks, parameterized SQL, admin session cookie, and per-IP-hash rate limits.
 
-## Cloudflare bindings / secrets
+## Deployment
 
-Bind the D1 database as DB (database name: mythic-community-db).
-
-Set these variables in the Pages project's production and preview environments as secret text:
-
-- ADMIN_PASSWORD — administrator password.
-- ADMIN_SESSION_SECRET — long, random session signing key.
-- IP_HASH_SALT — independent, long, random salt for one-way IP hashes.
-
-Do not add any of these secrets to Git. The administrator password is stored as a Cloudflare secret, not in the client JavaScript.
+The live Worker is named `mythic-community` and uses the D1 binding `DB` (`mythic-community-db`). The Worker entrypoint `worker.js` bundles the frontend assets and API and is deployed directly to Cloudflare Workers. The admin password is checked server-side using a PBKDF2 hash and salt stored in the private D1 `admin_config` table; the plain password is not present in the browser code or public repository. Session tokens are random, stored hashed in D1, and sent only in Secure, HttpOnly, SameSite cookies. The IP hash salt is stored server-side in D1 and no raw visitor IP is persisted.
 
 ## Important deployment behavior
 
 - This project uses serverless Pages Functions and D1; no VM or self-managed server is required. Free-plan allowances and features are controlled by Cloudflare and may change.
-- A Pages project must be connected to a Git provider and built/deployed before its pages.dev URL becomes live.
+- The Cloudflare Pages project is not the live target; direct Worker deployment avoids the unavailable Git integration.
 - Browsers must use HTTPS for the PWA install prompt and secure admin cookie.
 - IP addresses are used only in-memory to compute a salted HMAC and are never persisted as raw addresses. Lifetime counts are unique IP hashes; daily counts are unique IP hashes per Korea-local date.
 - The notification panel shows recent community posts. Browser notifications can appear while this website is open and permission is granted; this is not a background push-notification service.
