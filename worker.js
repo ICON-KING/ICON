@@ -382,11 +382,11 @@ async function sendPushNotifications(env, payload) {
       try {
         await sendOnePush(env.DB, subscription, payload, vapidConfig);
       } catch (error) {
-        console.warn("MYTHIC push delivery failed:", error?.message || "unknown");
+        console.warn("MYTHIC push delivery failed; endpoint details omitted.");
       }
     }));
   } catch (error) {
-    console.warn("MYTHIC push dispatch failed:", error?.message || "unknown");
+    console.warn("MYTHIC push dispatch failed; details omitted.");
   }
 }
 
@@ -734,7 +734,7 @@ export default {
     const file = STATIC_FILES[route];
     const headers = new Headers(DEFAULT_HEADERS);
     headers.set("Content-Type", file.type);
-    headers.set("Cache-Control", route === "/" || route === "/index.html" ? "no-cache" : "public, max-age=300");
+    headers.set("Cache-Control", route === "/" || route === "/index.html" || route === "/sw.js" ? "no-cache" : "public, max-age=300");
     if (request.method === "HEAD") return new Response(null, {status:200, headers});
     return new Response(file.body, {status:200, headers});
   }
