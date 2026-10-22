@@ -7,7 +7,7 @@ A responsive Korean-language community site deployed as a Cloudflare Worker with
 - White-and-gold MYTHIC branding; one golden sigil is used for the logo, favicon, and PWA app icon.
 - Anonymous posting, comments, search, board/category filtering, pinning and admin deletion.
 - Multi-image uploads (up to 8 images) with browser-side WebP compression and thumbnails.
-- Recent-post notification panel and optional browser notifications while the site is open.
+- In-site notification panel plus standards-based background Web Push for new posts and comments after users explicitly opt in, including notification click-through to the related post.
 - Installable PWA shell and basic offline fallback for static UI files.
 - Admin dashboard with total unique IPs, daily unique IPs (Asia/Seoul date), post totals, and a 7-day chart.
 - Security headers, same-origin checks, parameterized SQL, admin session cookie, and per-IP-hash rate limits.
@@ -22,7 +22,7 @@ The live Worker is named `mythic-community` and uses the D1 binding `DB` (`mythi
 - The Cloudflare Pages project is not the live target; direct Worker deployment avoids the unavailable Git integration.
 - Browsers must use HTTPS for the PWA install prompt and secure admin cookie.
 - IP addresses are used only in-memory to compute a salted HMAC and are never persisted as raw addresses. Lifetime counts store each IP hash once. The daily counter includes only IP hashes first seen by the site on that Korea-local date; a returning IP from any earlier date is not counted again.
-- The notification panel shows recent community posts. Browser notifications can appear while this website is open and permission is granted; this is not a background push-notification service.
+- Background Web Push uses VAPID, P-256 ECDH, HKDF-SHA-256 and AES-128-GCM. The VAPID key pair is generated on the server on first opt-in and stored in the private D1 admin_config table; the private key is never included in frontend assets or committed to Git. Users must opt in in each browser/device. Actual delivery timing depends on the browser push service and device network state.
 - Photo data is compressed in the browser and stored in D1. Keep uploads moderate to stay within request and database limits.
 
 ## Local schema
