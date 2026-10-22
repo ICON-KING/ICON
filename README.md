@@ -21,7 +21,7 @@ The live Worker is named `mythic-community` and uses the D1 binding `DB` (`mythi
 - This project uses serverless Pages Functions and D1; no VM or self-managed server is required. Free-plan allowances and features are controlled by Cloudflare and may change.
 - The Cloudflare Pages project is not the live target; direct Worker deployment avoids the unavailable Git integration.
 - Browsers must use HTTPS for the PWA install prompt and secure admin cookie.
-- IP addresses are used only in-memory to compute a salted HMAC and are never persisted as raw addresses. Lifetime counts are unique IP hashes; daily counts are unique IP hashes per Korea-local date.
+- IP addresses are used only in-memory to compute a salted HMAC and are never persisted as raw addresses. Lifetime counts store each IP hash once. The daily counter includes only IP hashes first seen by the site on that Korea-local date; a returning IP from any earlier date is not counted again.
 - The notification panel shows recent community posts. Browser notifications can appear while this website is open and permission is granted; this is not a background push-notification service.
 - Photo data is compressed in the browser and stored in D1. Keep uploads moderate to stay within request and database limits.
 
