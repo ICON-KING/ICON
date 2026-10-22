@@ -434,20 +434,15 @@
         img.src = image.data_url;
         img.alt = post.title + " 사진 " + (index + 1);
         img.loading = "lazy";
-        img.addEventListener("click", () => {
-          const viewer = window.open("", "_blank", "noopener,noreferrer");
-          if (viewer) {
-            const doc = viewer.document;
-            doc.title = "MYTHIC — " + post.title;
-            const style = doc.createElement("style");
-            style.textContent = "body{margin:0;background:#161611;display:grid;place-items:center;min-height:100vh}img{max-width:100vw;max-height:100vh;object-fit:contain}";
-            doc.head.append(style);
-            const largeImage = doc.createElement("img");
-            largeImage.src = image.data_url;
-            largeImage.alt = post.title;
-            doc.body.append(largeImage);
-          } else {
-            toast("브라우저가 새 창을 차단했습니다. 이미지를 길게 눌러 저장할 수 있어요.", "error");
+        img.setAttribute("role", "button");
+        img.setAttribute("tabindex", "0");
+        img.setAttribute("aria-label", "사진 확대/축소");
+        const toggleImageZoom = () => img.classList.toggle("expanded");
+        img.addEventListener("click", toggleImageZoom);
+        img.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleImageZoom();
           }
         });
         grid.append(img);
@@ -707,7 +702,7 @@
       const wrap = node("div", "chart-bar-wrap");
       const bar = node("div", "chart-bar");
       const value = Number(day.count || 0);
-      bar.style.height = Math.max(3, value / max * 76) + "px";
+      const percentage = Math.min(100, Math.max(4, Math.round(value / max * 100)));\n      bar.className = "chart-bar h-" + percentage;
       bar.title = value + "명";
       wrap.append(bar);
       barDay.append(wrap);
