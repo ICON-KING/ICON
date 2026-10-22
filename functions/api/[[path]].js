@@ -179,7 +179,25 @@ async function requireAdmin(request, env) {
   const ok = await isAdmin(request, env);
   return ok ? null : json({ error: "관리자 인증이 필요합니다. 다시 로그인해 주세요." }, 401);
 }
-const VAPID_PUBLIC_KEY = "BM6FKmNMPKqSj96oj5HSO_u8bntMjd43U_hPdqEKlYsb6KPR4o5fJ5HnuNavarXsRuNzWk9XTs6ZJKHjXHQI3lY";
+async function getVapidConfig(db) {
+  let row = await db.prepare("SELECT value FROM admin_config WHERE key = 'vapid_keys'").first();
+  if (row?.value) {
+    try { return JSON.parse(row.value); } catch {}
+  }
+  const pair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"]
+  );
+  const privateKey = bytesToBase64Url(new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey)));
+  const publicKey = bytesToBase64Url(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)));
+  const candidate = JSON.stringify({ private_key: privateKey, public_key: publicKey });
+  await db.prepare("INSERT OR IGNORE INTO admin_config (key, value) VALUES ('vapid_keys', ?)")
+    .bind(candidate).run();
+  row = await db.prepare("SELECT value FROM admin_config WHERE key = 'vapid_keys'").first();
+  if (!row?.value) throw new Error("Could not initialize VAPID keys");
+  return JSON.parse(row.value);
+}
 
 function base64UrlToBytes(value) {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -235,8 +253,8 @@ function textBytes(value) {
   return new TextEncoder().encode(value);
 }
 
-async function createVapidToken(endpoint, env) {
-  if (!env.VAPID_PRIVATE_KEY) throw new Error("VAPID private key is not configured");
+async function createVapidToken(endpoint, vapidConfig) {
+  if (!vapidConfig?.private_key || !vapidConfig?.public_key) throw new Error("VAPID keys are not configured");
   const endpointUrl = new URL(endpoint);
   const header = bytesToBase64Url(textBytes(JSON.stringify({ typ: "JWT", alg: "ES256" })));
   const claims = {
@@ -248,7 +266,7 @@ async function createVapidToken(endpoint, env) {
   const signingInput = header + "." + payload;
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
-    base64UrlToBytes(env.VAPID_PRIVATE_KEY),
+    base64UrlToBytes(vapidConfig.private_key),
     { name: "ECDSA", namedCurve: "P-256" },
     false,
     ["sign"]
@@ -333,13 +351,13 @@ function isSupportedPushEndpoint(endpoint) {
   }
 }
 
-async function sendOnePush(env, subscription, payload) {
-  const token = await createVapidToken(subscription.endpoint, env);
+async function sendOnePush(db, subscription, payload, vapidConfig) {
+  const token = await createVapidToken(subscription.endpoint, vapidConfig);
   const encryptedBody = await encryptWebPush(subscription, payload);
   const response = await fetch(subscription.endpoint, {
     method: "POST",
     headers: {
-      "Authorization": "vapid t=" + token + ", k=" + VAPID_PUBLIC_KEY,
+      "Authorization": "vapid t=" + token + ", k=" + vapidConfig.public_key,
       "Content-Type": "application/octet-stream",
       "Content-Encoding": "aes128gcm",
       "TTL": "86400",
@@ -348,7 +366,7 @@ async function sendOnePush(env, subscription, payload) {
     body: encryptedBody
   });
   if (response.status === 404 || response.status === 410) {
-    await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint_hash = ?")
+    await db.prepare("DELETE FROM push_subscriptions WHERE endpoint_hash = ?")
       .bind(subscription.endpoint_hash).run();
   }
   return response.ok;
@@ -356,13 +374,13 @@ async function sendOnePush(env, subscription, payload) {
 
 async function sendPushNotifications(env, payload) {
   try {
-    if (!env.VAPID_PRIVATE_KEY) return;
+    const vapidConfig = await getVapidConfig(env.DB);
     const rows = await env.DB.prepare(
       "SELECT endpoint_hash, endpoint, p256dh, auth_secret FROM push_subscriptions ORDER BY created_at DESC LIMIT 40"
     ).all();
     await Promise.all((rows.results || []).map(async subscription => {
       try {
-        await sendOnePush(env, subscription, payload);
+        await sendOnePush(env.DB, subscription, payload, vapidConfig);
       } catch (error) {
         console.warn("MYTHIC push delivery failed:", error?.message || "unknown");
       }
@@ -418,11 +436,12 @@ async function handle(request, env, ctx) {
   }
 
   if (path.length === 2 && path[0] === "push" && path[1] === "public-key" && method === "GET") {
-    return json({ public_key: VAPID_PUBLIC_KEY });
+    const vapidConfig = await getVapidConfig(db);
+    return json({ public_key: vapidConfig.public_key });
   }
 
   if (path.length === 2 && path[0] === "push" && path[1] === "subscribe" && method === "POST") {
-    if (!env.VAPID_PRIVATE_KEY) return json({ error: "백그라운드 푸시 설정이 완료되지 않았습니다." }, 503);
+    await getVapidConfig(db);
     const ipHash = await clientIpHash(request, env);
     if (!await allowRate(db, ipHash, "push-subscribe", 12, 3600)) {
       return json({ error: "알림 설정 변경이 너무 잦습니다. 잠시 후 다시 시도해 주세요." }, 429);
