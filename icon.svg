@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">MYTHIC golden sigil</title>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d7bc7e"/>
+      <stop offset=".55" stop-color="#b99650"/>
+      <stop offset="1" stop-color="#89672e"/>
+    </linearGradient>
+    <radialGradient id="paper" cx=".32" cy=".24" r=".85">
+      <stop offset="0" stop-color="#fffefa"/>
+      <stop offset="1" stop-color="#f5edda"/>
+    </radialGradient>
+  </defs>
+  <circle cx="64" cy="64" r="61" fill="url(#paper)" stroke="#d4c08f" stroke-width="1.5"/>
+  <circle cx="64" cy="64" r="53" fill="none" stroke="#d9c79e" stroke-width="1"/>
+  <circle cx="64" cy="64" r="44" fill="none" stroke="#c8ad6d" stroke-width=".8" stroke-dasharray="1.8 4.2"/>
+  <path d="M64 19 73 49 103 38 82 61 107 78 76 77 64 108 52 77 21 78 46 61 25 38 55 49Z" fill="url(#gold)" opacity=".97"/>
+  <path d="M64 31 69 56 93 64 69 71 64 96 59 71 35 64 59 56Z" fill="#fffaf0" opacity=".95"/>
+  <circle cx="64" cy="64" r="8.5" fill="url(#gold)"/>
+  <path d="M64 4v8M64 116v8M4 64h8M116 64h8" stroke="#b99650" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
