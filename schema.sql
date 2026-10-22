@@ -65,3 +65,15 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   expires_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
+
+
+-- Browser subscriptions for encrypted Web Push notifications.
+-- The endpoint is a capability URL and must remain server-side; raw IPs are never stored here.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  endpoint_hash TEXT PRIMARY KEY,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth_secret TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_created ON push_subscriptions(created_at);
