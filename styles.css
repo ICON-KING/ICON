@@ -437,3 +437,9 @@ img { max-width: 100%; display: block; }
 .hero-art .art-caption, .hero-art .star, .hero-art .orbit { display: none !important; }
 .sigil-disc { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .sigil-disc img { filter: none; }
+
+
+/* MYTHIC v8: bold M monogram, without orbit rings or tiny ornaments. */
+.hero-art .art-caption, .hero-art .star, .hero-art .orbit { display: none !important; }
+.sigil-disc { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.sigil-disc img { filter: none; }

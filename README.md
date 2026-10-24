@@ -4,7 +4,7 @@ A responsive Korean-language community site deployed as a Cloudflare Worker with
 
 ## Included
 
-- Unified MYTHIC identity: a bold geometric M monogram inspired by mythic crests and legends, shared by the SVG logo, ICO/PNG favicons, Apple touch icon, Safari pinned-tab icon, social preview, and PWA icons. Deep navy, ivory, and gold, designed for clarity at small sizes; no orbital rings.
+- Unified MYTHIC identity: one bold geometric M monogram for the SVG logo, ICO/PNG favicons, Apple touch icon, Safari pinned-tab icon, social preview, and PWA icons. Deep navy and ivory create high contrast at small sizes; no orbit rings or fine details.
 - Anonymous posting, comments, search, board/category filtering, pinning and admin deletion.
 - Multi-image uploads (up to 8 images) with browser-side WebP compression and thumbnails.
 - In-site notification panel plus standards-based background Web Push for new posts and comments after users explicitly opt in, including notification click-through to the related post.
