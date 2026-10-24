@@ -4,7 +4,7 @@ A responsive Korean-language community site deployed as a Cloudflare Worker with
 
 ## Included
 
-- White-and-gold MYTHIC branding; one golden sigil is used for the logo, favicon, and PWA app icon.
+- Unified MYTHIC identity: a phoenix rising from an open book, shared by the SVG logo, ICO/PNG favicons, Apple touch icon, Safari pinned-tab icon, social preview, and PWA app icons. Deep navy, ivory, gold, and cyan; no orbital rings.
 - Anonymous posting, comments, search, board/category filtering, pinning and admin deletion.
 - Multi-image uploads (up to 8 images) with browser-side WebP compression and thumbnails.
 - In-site notification panel plus standards-based background Web Push for new posts and comments after users explicitly opt in, including notification click-through to the related post.
