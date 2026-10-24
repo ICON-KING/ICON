@@ -337,7 +337,7 @@ img { max-width: 100%; display: block; }
   .hero-copy { padding-bottom: 0; }
   .hero h1 { font-size: clamp(65px, 15vw, 102px); margin-top: 19px; }
   .hero-lead { font-size: 17px; }
-  .hero-art { position: absolute; right: -68px; top: 94px; width: 280px; min-height: 280px; opacity: .32; transform: scale(.68); transform-origin: center center; pointer-events: none; }
+  .hero-art { position: absolute; right: -68px; top: 94px; width: 280px; min-height: 280px; opacity: .56; transform: scale(.68); transform-origin: center center; pointer-events: none; }
   .hero-art .art-caption, .hero-art .star { display: none; }
   .hero-index { bottom: 21px; }
   .intro-strip { grid-template-columns: 1fr; margin-top: 0; }
@@ -392,7 +392,7 @@ img { max-width: 100%; display: block; }
   .hero-actions { align-items: flex-start; flex-direction: column; gap: 11px; margin-top: 25px; }
   .hero-actions .button { min-height: 45px; }
   .hero-note { margin-top: 18px; }
-  .hero-art { top: 120px; right: -118px; opacity: .2; }
+  .hero-art { top: 120px; right: -118px; opacity: .38; }
   .section-heading { gap: 10px; }
   .section-heading h2 { font-size: 29px; }
   .section-heading > .button { padding-inline: 10px; font-size: 10px; }
@@ -431,3 +431,9 @@ img { max-width: 100%; display: block; }
 .hero-art { min-width: 0; }
 .sigil-disc { width: min(100%, 340px); height: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .sigil-disc img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; filter: none; }
+
+
+/* MYTHIC v7: the bold M monogram is the only brand symbol. */
+.hero-art .art-caption, .hero-art .star, .hero-art .orbit { display: none !important; }
+.sigil-disc { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.sigil-disc img { filter: none; }

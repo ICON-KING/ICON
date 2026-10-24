@@ -1,5 +1,5 @@
-const CACHE_NAME = "mythic-shell-v3";
-const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/icon.svg?v=6", "/icon-192.png?v=6", "/icon-512.png?v=6", "/apple-touch-icon.png?v=6", "/favicon.ico?v=6", "/safari-pinned-tab.svg?v=6", "/manifest.webmanifest?v=6"];
+const CACHE_NAME = "mythic-shell-v4";
+const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/icon.svg?v=7", "/icon-192.png?v=7", "/icon-512.png?v=7", "/apple-touch-icon.png?v=7", "/favicon.ico?v=7", "/safari-pinned-tab.svg?v=7", "/manifest.webmanifest?v=7"];
 
 
 self.addEventListener("push", event => {
@@ -21,8 +21,8 @@ self.addEventListener("push", event => {
     } catch {}
     await self.registration.showNotification(title, {
       body,
-      icon: "/icon-192.png?v=6",
-      badge: "/favicon.ico?v=6",
+      icon: "/icon-192.png?v=7",
+      badge: "/favicon.ico?v=7",
       tag: typeof payload.tag === "string" ? payload.tag.slice(0, 100) : "mythic-push",
       renotify: false,
       data: { url: target }
