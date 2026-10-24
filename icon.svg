@@ -1,21 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
-  <title id="title">MYTHIC golden sigil</title>
-  <defs>
-    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#d7bc7e"/>
-      <stop offset=".55" stop-color="#b99650"/>
-      <stop offset="1" stop-color="#89672e"/>
-    </linearGradient>
-    <radialGradient id="paper" cx=".32" cy=".24" r=".85">
-      <stop offset="0" stop-color="#fffefa"/>
-      <stop offset="1" stop-color="#f5edda"/>
-    </radialGradient>
-  </defs>
-  <circle cx="64" cy="64" r="61" fill="url(#paper)" stroke="#d4c08f" stroke-width="1.5"/>
-  <circle cx="64" cy="64" r="53" fill="none" stroke="#d9c79e" stroke-width="1"/>
-  <circle cx="64" cy="64" r="44" fill="none" stroke="#c8ad6d" stroke-width=".8" stroke-dasharray="1.8 4.2"/>
-  <path d="M64 19 73 49 103 38 82 61 107 78 76 77 64 108 52 77 21 78 46 61 25 38 55 49Z" fill="url(#gold)" opacity=".97"/>
-  <path d="M64 31 69 56 93 64 69 71 64 96 59 71 35 64 59 56Z" fill="#fffaf0" opacity=".95"/>
-  <circle cx="64" cy="64" r="8.5" fill="url(#gold)"/>
-  <path d="M64 4v8M64 116v8M4 64h8M116 64h8" stroke="#b99650" stroke-width="1.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">MYTHIC</title>
+  <desc id="desc">A mythic phoenix rising from an open book, symbolizing stories becoming legends.</desc>
+  <rect width="512" height="512" fill="#080c3a"/>
+  <g transform="translate(256 256) scale(0.84) translate(-256 -256)">
+    <g fill="#fff4d9">
+      <path d="M246 288C223 251 186 225 161 186C145 164 136 134 138 102C160 148 196 176 220 208C238 235 248 259 246 288Z"/>
+      <path d="M266 288C289 251 326 225 351 186C367 164 376 134 374 102C352 148 316 176 292 208C274 235 264 259 266 288Z"/>
+      <path d="M238 294C208 269 159 251 126 216C112 203 104 187 104 171C131 192 162 205 188 222C214 240 231 263 238 294Z"/>
+      <path d="M274 294C304 269 353 251 386 216C400 203 408 187 408 171C381 192 350 205 324 222C298 240 281 263 274 294Z"/>
+      <path d="M237 309C204 294 162 285 120 280C135 304 171 318 211 323C227 325 236 318 237 309Z"/>
+      <path d="M275 309C308 294 350 285 392 280C377 304 341 318 301 323C285 325 276 318 275 309Z"/>
+    </g>
+    <g fill="#e9bb4e">
+      <path d="M236 320C208 325 180 341 159 357C186 361 214 350 240 334Z"/>
+      <path d="M276 320C304 325 332 341 353 357C326 361 298 350 272 334Z"/>
+      <path d="M238 286C220 267 196 252 167 241C193 264 211 282 232 306Z"/>
+      <path d="M274 286C292 267 316 252 345 241C319 264 301 282 280 306Z"/>
+    </g>
+    <g fill="#fff4d9">
+      <path d="M249 260C237 242 236 228 244 213C251 201 264 194 281 190C267 188 254 181 248 170C264 178 278 178 291 173C304 168 319 174 330 181C315 184 307 193 301 204C295 216 286 222 283 235C280 249 286 262 292 275C302 296 292 317 278 335C268 349 259 365 256 384C249 363 237 347 229 330C218 308 224 287 241 271Z"/>
+      <path d="M253 202C239 194 233 184 236 171C247 181 261 182 276 176C288 171 298 176 309 183C291 184 281 195 275 207Z"/>
+    </g>
+    <path d="M258 288C279 314 276 340 256 367C237 340 234 314 258 288Z" fill="#18bdf0"/>
+    <path d="M256 315C263 325 262 337 256 345C250 337 249 325 256 315Z" fill="#d9fbff"/>
+    <g>
+      <path d="M111 389H184L244 405V427L183 411L126 408Z" fill="#fff4d9"/>
+      <path d="M401 389H328L268 405V427L329 411L386 408Z" fill="#fff4d9"/>
+      <path d="M112 423H184L244 439V448L181 432L118 432Z" fill="#e9bb4e"/>
+      <path d="M400 423H328L268 439V448L331 432L394 432Z" fill="#e9bb4e"/>
+    </g>
+  </g>
 </svg>
