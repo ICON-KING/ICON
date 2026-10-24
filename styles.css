@@ -125,19 +125,11 @@ img { max-width: 100%; display: block; }
 .hero-note { display: flex; align-items: center; gap: 8px; color: #85857d; margin-top: 26px; font-size: 11px; }
 .live-dot { width: 7px; height: 7px; flex: 0 0 7px; display: inline-block; border-radius: 50%; background: #8d9d71; box-shadow: 0 0 0 3px rgba(141,157,113,.13); }
 .hero-art { position: relative; min-height: 390px; display: grid; place-items: center; margin-left: 8px; isolation: isolate; }
-.sigil-disc { z-index: 3; position: relative; display: grid; place-items: center; width: 170px; height: 170px; border: 1px solid rgba(185,150,80,.45); border-radius: 50%; background: radial-gradient(circle at 44% 34%, #fffefa, #f9f4e8 67%, #f0e6d0); box-shadow: 0 18px 70px rgba(185,150,80,.14), inset 0 0 0 10px rgba(255,255,255,.56); }
-.sigil-disc img { width: 96px; height: 96px; filter: drop-shadow(0 8px 14px rgba(126,95,36,.13)); }
-.orbit { position: absolute; left: 50%; top: 50%; border: 1px solid rgba(185,150,80,.26); border-radius: 50%; transform: translate(-50%,-50%); pointer-events: none; }
-.orbit-one { width: 270px; height: 270px; }
-.orbit-two { width: 344px; height: 344px; border-style: dashed; border-color: rgba(185,150,80,.2); }
-.orbit-three { width: 425px; height: 425px; border-color: rgba(185,150,80,.13); }
+.sigil-disc { z-index: 3; position: relative; display: grid; place-items: center; width: min(100%, 340px); height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.sigil-disc img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; filter: none; }
 .art-caption { position: absolute; z-index: 4; padding: 5px 9px; background: #fff; color: #97804e; font-size: 9px; font-weight: 700; letter-spacing: .17em; }
 .art-caption-top { top: 16px; right: 8px; }
 .art-caption-bottom { bottom: 18px; left: 0; }
-.star { position: absolute; z-index: 4; color: var(--gold); font-size: 24px; }
-.star-a { top: 63px; left: 65px; font-size: 17px; }
-.star-b { bottom: 77px; right: 49px; font-size: 22px; }
-.star-c { top: 96px; right: 42px; font-size: 13px; }
 .hero-index { position: absolute; bottom: 19px; left: 0; display: flex; align-items: center; gap: 12px; color: #98958a; font-size: 9px; font-weight: 700; letter-spacing: .17em; }
 .hero-index span:first-child { color: var(--gold-deep); }
 .index-rule { display: inline-block; width: 52px; height: 1px; background: #d9d3c3; }
@@ -433,3 +425,9 @@ img { max-width: 100%; display: block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* MYTHIC unified phoenix/book identity: no orbital rings or separate sigil disc. */
+.hero-art { min-width: 0; }
+.sigil-disc { width: min(100%, 340px); height: auto; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.sigil-disc img { width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; filter: none; }
